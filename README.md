@@ -1,4 +1,5 @@
 # ComfyUI-Common-toolbox
+版本: `v1.3`
 
 ## 兼容性
 
@@ -35,7 +36,7 @@ ComfyUI/
 
 > ⚠️ 请勿把本文件夹放在其它插件目录内或重命名带版本号后缀；升级时**覆盖同名文件夹**或先删除旧文件夹再复制，避免双重注册。
 
-## 4 个节点
+## 12 个节点
 
 ### 1. Crop Mode Selector (构图模式选择器)
 
@@ -122,6 +123,101 @@ ComfyUI/
 ### 4. Contact Sheet Builder (拼图工具)
 
 独立通用拼图节点，不依赖其它节点。
+
+### 5. Empty Latent Selector (空 latent 生成器)
+
+按画幅比 / 尺寸档位生成空 latent，自动适配不同 VAE 的 latent 通道数与维度。
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `vae_type` | 下拉 | z_image_ae | VAE 预设 (z_image / qwen / Wan 等) |
+| `orientation` | BOOL | True | 横构图 / 竖构图 |
+| `ratio` | 下拉 | 3:2 (photo) | 画幅比 |
+| `size` | 下拉 | medium 1.7MP | 尺寸档位 |
+| `batch_size` | INT | 1 | 批量张数 |
+| `vae` (可选) | VAE | — | 连接真实 VAE 时按其 latent_channels 自动对齐 |
+
+**输出:** `latent` / `width` / `height` / `long_side` / `count`
+
+### 6. Seed Time (实时种子)
+
+带 `trigger` 输入的随机种子节点，trigger 值一变化就重新生成 seed，适合做「每次出图都不一样」的流程。
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `trigger` | STRING | 0 | 触发值，任何数字变化立即重算 seed（支持 int/float/string 连接） |
+| `mode` | 下拉 | randomize | randomize / increment / increment random / decrement / fixed / only trigger change |
+
+**输出:** `seed` (INT) / `seed_text` (STRING)
+
+### 7. Time Format (时间格式化)
+
+trigger 变化时实时输出当前时间，可输出格式化字符串或 unix 时间戳。
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `trigger` | STRING | 0 | 触发值，变化时重算时间 |
+| `preset` | 下拉 | %Y-%m-%d-%H%M%S | 预设格式；含 `unix` / `unix-ms` / `custom` |
+| `custom_format` | STRING | %Y/%m/%d %H:%M:%S | 仅 preset=custom 时生效 |
+
+**输出:** `timestamp` (STRING)
+
+### 8. Batch Any Merge (批次合并)
+
+把 N 个同类型对象合并为一个 batch，支持 latent / Tensor / list / tuple / 基础类型。latent 会连同 `state_info` 一起合并，因此 ClownsharK 等带采样状态的节点可正常串联。
+
+- `inputcount` 控制输入槽数量，改完点 **Update inputs** 刷新
+- 空间尺寸不一致的 Tensor 自动缩放到第一个输入的分辨率
+
+**输出:** `batch` (*)
+
+### 9. Get Any From Batch (批次切片)
+
+从 batch 中按索引取出指定区间，是 Batch Any Merge 的逆操作。同样支持 latent（连 `state_info` 一起切片）/ Tensor / list / tuple / 基础类型。
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `any_input` | * | — | 待切片数据 |
+| `batch_index` | INT | 0 | 起始索引，支持负数 |
+| `length` | INT | 1 | 取出长度 |
+
+**输出:** `sliced` (*)
+
+### 10. Power Lora Stack (可视化 LoRA 堆叠)
+
+在节点内直接增删排序 LoRA 条目，每行一个独立 widget。
+
+- 每行一个 LoRA：`lora_1` … `lora_50`，由前端动态显示与排序
+- 节点高度随条目数量自动收缩，未添加 LoRA 时只占一个 Add 按钮
+- 每行可开关；点击强度框直接输入数值
+- 悬停条目查看预览图（读取 LoRA 同目录下的同名图片）
+- 右键条目可 Disable / Enable、Move to Top / Up / Down / Bottom
+
+**输出:** `model` / `lora_stack` / `clip`（当前前端仅暴露 `lora_stack`）
+
+### 11. Load Lora Stack (LoRA 堆栈加载)
+
+把 `lora_stack` 中的 LoRA 按条目顺序依次应用到 model / clip。
+
+| 参数 | 类型 | 说明 |
+|---|---|---|
+| `model` | MODEL | 基础模型 |
+| `lora_stack` | LORA_STACK | 来自 Power Lora Stack |
+| `clip` (可选) | CLIP | 传入则同步加载 LoRA 的 clip 部分 |
+| `unload_trigger` (可选) | INT | 前端 Unload 按钮递增此值：清空该节点的 LoRA 缓存并进入 bypass（直接返回原始 model/clip）；一旦 `lora_stack` 内容变化会自动退出 bypass 重新加载 |
+
+**输出:** `model` / `clip`
+
+### 12. Load Unet Diffusion Model (UNET 加载)
+
+参数与官方 Load Diffusion Model 一致，但 `unet_name` 换成了自定义级联选择器：可按目录逐级浏览、悬停查看预览图，便于在多级子目录中定位模型。
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `unet_name` | 下拉 | — | `models/diffusion_models` 下的模型（前端为级联菜单 + 悬停预览） |
+| `weight_dtype` | 下拉 | default | default / fp8_e4m3fn / fp8_e4m3fn_fast / fp8_e5m2 |
+
+**输出:** `model` (MODEL)
 
 ## 文件保存说明 (重要)
 
@@ -223,9 +319,6 @@ localStorage.setItem("comp_crop_debug", "1")
 
 A: 确认 `web/composition_nodes.js` 文件存在, ComfyUI 重启后自动加载。旧版 ComfyUI 可能不支持 `WEB_DIRECTORY`, 需要升级。
 
-### Q: 自定义模板上传后怎么用?
-
-A: 上传的参考图自动提取宽高比, 附加到构图候选中。每个"启用的模板" × "每个自定义画幅" 都会生成一个候选。
 
 ### Q: 怎么同时探索多种构图风格?
 
