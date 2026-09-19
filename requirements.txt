@@ -1,4 +1,0 @@
-# ComfyUI-Common-toolbox — 无额外依赖
-# 全部依赖均为 ComfyUI 自带: numpy / torch / Pillow
-# opencv-python 为可选加速 (缺失时自动回退纯 PIL 实现), 如需启用:
-#   pip install opencv-python
